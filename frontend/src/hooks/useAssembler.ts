@@ -156,7 +156,7 @@ export function useAssembler() {
       const listFilename = "input.lst";
 
       // Convert hex format from XXH to 0xXX
-      asmCode.replace(/\b([0-9A-Fa-f]+)H\b/g, '0x$1');
+      const processedCode = asmCode.replace(/\b([0-9A-Fa-f]+)H\b/g, '0x$1');
 
       // Find which system calls are used in the code
       const usedSystemCalls: string[] = [];
