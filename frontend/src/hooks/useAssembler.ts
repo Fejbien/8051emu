@@ -155,17 +155,20 @@ export function useAssembler() {
       const inputFilename = "input.asm";
       const listFilename = "input.lst";
 
+      // Convert hex format from XXH to 0xXX
+      asmCode.replace(/\b([0-9A-Fa-f]+)H\b/g, '0x$1');
+
       // Find which system calls are used in the code
       const usedSystemCalls: string[] = [];
       for (const syscallName in SYSTEM_CALLS) {
         const regex = new RegExp(`\\b${syscallName}\\b`, 'i');
-        if (regex.test(asmCode)) {
+        if (regex.test(processedCode)) {
           usedSystemCalls.push(SYSTEM_CALLS[syscallName]);
         }
       }
 
       // Append only the used system call definitions
-      let codeWithSystemCalls = asmCode;
+      let codeWithSystemCalls = processedCode;
       if (usedSystemCalls.length > 0) {
         codeWithSystemCalls += '\n' + usedSystemCalls.join('\n') + '\n';
       }

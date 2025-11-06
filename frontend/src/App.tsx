@@ -8,6 +8,7 @@ import { HexInput } from "./components/HexInput";
 import { EmulatorControls } from "./components/EmulatorControls";
 import { LCDOutput } from "./components/LCDOutput";
 import { Keypad } from "./components/Keypad";
+import { RAMViewer } from "./components/RAMViewer";
 
 function App() {
   const [showHexOutput, setShowHexOutput] = useState(false);
@@ -39,6 +40,7 @@ function App() {
     handleStep,
     handleResetEmulator,
     handleKeypad,
+    readRAM,
   } = useEmulator();
 
   useEffect(() => {
@@ -164,8 +166,13 @@ function App() {
                 <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded border">
                   Load and run a program to see register values
               </p>
-            )}
+              )}
             </div>
+            <RAMViewer
+              emulatorReady={emulatorReady}
+              emulatorLoaded={emulatorLoaded}
+              onReadRAM={readRAM}
+            />
           </div>
         </div>
       </main>

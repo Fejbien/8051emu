@@ -338,11 +338,15 @@ export function useEmulator() {
   }
 
   function handleRunCycleChange(value: string) {
+    console.log('handleRunCycleChange called with:', value);
     const parsed = parseInt(value, 10);
-    if (Number.isNaN(parsed) || parsed <= 0) {
-      setRunCycles(1);
+    console.log('Parsed value:', parsed);
+    if (isNaN(parsed) || parsed <= 0) {
+      console.log('Invalid, setting to 1000');
+      setRunCycles(1000);
       return;
     }
+    console.log('Setting runCycles to:', parsed);
     setRunCycles(parsed);
   }
 
@@ -352,30 +356,28 @@ export function useEmulator() {
       return;
     }
     const { api, instance } = context;
-    const totalCycles = Math.max(1, Math.floor(cycles ?? runCycles));
     
-    // Run in smaller chunks to prevent UI blocking
-    const chunkSize = 100;
-    let remaining = totalCycles;
+    // Ensure we have a valid number
+    let count = cycles ?? runCycles;
+    if (typeof count !== 'number' || isNaN(count) || count <= 0) {
+      console.error('Invalid cycle count:', count);
+      count = 1000; // Default fallback
+    }
+    count = Math.max(1, Math.floor(count));
     
-    const runChunk = () => {
-      const toRun = Math.min(remaining, chunkSize);
-      api.runCycles(instance, toRun);
-      remaining -= toRun;
-      
+    console.log('Running', count, 'cycles');
+    setTimeout(() => {
+      console.log('Executing runCycles');
+      api.runCycles(instance, count);
+      console.log('Pulling output');
       pullEmulatorOutput();
+      console.log('Pulling state');
       pullEmulatorState();
+      console.log('Updating wait status');
       updateWaitStatus();
-      
-      if (remaining > 0 && !api.isWaiting(instance)) {
-        // Continue running in next frame
-        requestAnimationFrame(runChunk);
-      } else {
-        setEmulatorStatus(`Ran ${totalCycles.toLocaleString()} cycles.`);
-      }
-    };
-    
-    runChunk();
+      console.log('Done');
+      setEmulatorStatus(`Ran ${count.toLocaleString()} cycles.`);
+    }, 0);
   }
 
   function handleStep() {
@@ -449,7 +451,8 @@ export function useEmulator() {
       module._free(ptr);
     }
 
-    const autoCycles = Math.max(20, Math.floor(runCycles / 10));
+    // const autoCycles = Math.max(20, Math.floor(runCycles / 10));
+    const autoCycles = 1000;
     api.runCycles(instance, autoCycles);
     pullEmulatorOutput();
     pullEmulatorState();
@@ -462,6 +465,20 @@ export function useEmulator() {
     } else {
       setEmulatorStatus(`Sent '${value}' to emulator.`);
     }
+  }
+
+  function readRAM(): Uint8Array | null {
+    const context = getEmulatorContext();
+    if (!context) {
+      return null;
+    }
+    const { api, instance } = context;
+    
+    const ram = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) {
+      ram[i] = api.readByte(instance, i);
+    }
+    return ram;
   }
 
   return {
@@ -481,6 +498,7 @@ export function useEmulator() {
     handleStep,
     handleResetEmulator,
     handleKeypad,
+    readRAM,
   };
 }
 
