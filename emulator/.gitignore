@@ -1,0 +1,26 @@
+# Compiled executables
+8051emu
+*.o
+*.out
+
+# Object files
+*.obj
+
+# Build files
+*.d
+
+# Listing files
+*.lst
+*.map
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
