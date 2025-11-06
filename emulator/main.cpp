@@ -1,5 +1,9 @@
+#include <algorithm>
+#include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <deque>
 #include <fstream>
 #include <functional>
 #include <iomanip>
@@ -7,6 +11,20 @@
 #include <map>
 #include <sstream>
 #include <string>
+
+struct EmulatorState {
+  uint64_t cycles;
+  uint16_t pc;
+  uint16_t dptr;
+  uint8_t sp;
+  uint8_t a;
+  uint8_t b;
+  uint8_t psw;
+  uint8_t p0;
+  uint8_t p1;
+  uint8_t p2;
+  uint8_t p3;
+};
 
 class Intel8051 {
 private:
@@ -42,6 +60,24 @@ private:
 
   bool running;
   uint64_t cycleCount;
+
+  enum class WaitType {
+    None = 0,
+    WaitEnter = 1,
+    WaitEnterNW = 2,
+    WaitEnterEsc = 3,
+    WaitKey = 4,
+    GetNum = 5
+  };
+
+  enum class SystemCallResult { NotHandled, Handled, Pending };
+
+  bool captureOutput;
+  bool mirrorStdout;
+  std::deque<char> outputBuffer;
+  std::deque<char> inputBuffer;
+  bool waitingForInput;
+  WaitType waitType;
 
   // System call table for monitor routines
   std::map<uint16_t, std::function<void()>> systemCalls;
@@ -189,6 +225,110 @@ private:
     }
   }
 
+  bool loadHexStream(std::istream &stream, bool verbose,
+                     const std::string &sourceLabel) {
+    std::string line;
+    uint32_t extendedAddress = 0;
+
+    while (std::getline(stream, line)) {
+      if (line.empty() || line[0] != ':') {
+        continue;
+      }
+
+      if (line.length() < 11) {
+        std::cerr << "Warning: Invalid line in HEX data: " << line << std::endl;
+        continue;
+      }
+
+      uint8_t byteCount = std::stoi(line.substr(1, 2), nullptr, 16);
+      uint16_t address = std::stoi(line.substr(3, 4), nullptr, 16);
+      uint8_t recordType = std::stoi(line.substr(7, 2), nullptr, 16);
+
+      if (recordType == 0x00) {
+        // Data record
+        uint32_t fullAddress = extendedAddress + address;
+        for (int i = 0; i < byteCount; i++) {
+          uint8_t byte = std::stoi(line.substr(9 + i * 2, 2), nullptr, 16);
+          if (fullAddress + i < sizeof(programMemory)) {
+            programMemory[fullAddress + i] = byte;
+          }
+        }
+      } else if (recordType == 0x01) {
+        // End of file record
+        break;
+      } else if (recordType == 0x02) {
+        // Extended segment address record
+        uint16_t segment = std::stoi(line.substr(9, 4), nullptr, 16);
+        extendedAddress = segment * 16;
+      } else if (recordType == 0x04) {
+        // Extended linear address record
+        uint16_t upper = std::stoi(line.substr(9, 4), nullptr, 16);
+        extendedAddress = upper << 16;
+      }
+    }
+
+    if (verbose) {
+      std::cout << "Successfully loaded HEX data from " << sourceLabel
+                << std::endl;
+    }
+
+    return true;
+  }
+
+  void appendOutputChar(char ch) {
+    if (mirrorStdout) {
+      std::cout << ch;
+      if (ch == '\n') {
+        std::cout.flush();
+      }
+    }
+    if (captureOutput) {
+      outputBuffer.push_back(ch);
+      if (ch == '\n') {
+        outputBuffer.clear();
+      }
+    }
+  }
+
+  void appendOutputString(const std::string &text) {
+    for (char ch : text) {
+      appendOutputChar(ch);
+    }
+  }
+
+  void setWaitState(WaitType type) {
+    waitingForInput = true;
+    waitType = type;
+  }
+
+  void clearWaitState() {
+    waitingForInput = false;
+    waitType = WaitType::None;
+  }
+
+  bool consumeLine(std::string &line) {
+    auto newlineIt = std::find_if(inputBuffer.begin(), inputBuffer.end(),
+                                  [](char c) { return c == '\n'; });
+    if (newlineIt == inputBuffer.end()) {
+      return false;
+    }
+
+    line.assign(inputBuffer.begin(), newlineIt);
+    auto eraseEnd = newlineIt;
+    ++eraseEnd;
+    inputBuffer.erase(inputBuffer.begin(), eraseEnd);
+    return true;
+  }
+
+  bool consumeChar(char &ch) {
+    if (inputBuffer.empty()) {
+      return false;
+    }
+    ch = inputBuffer.front();
+    inputBuffer.pop_front();
+    return true;
+  }
+
   // Monitor/BIOS functions for dsm-51 compatibility
   // DSM-51 System Calls
 
@@ -199,20 +339,21 @@ private:
       uint8_t ch = programMemory[addr++];
       if (ch == 0 || addr == 0)
         break;
-      std::cout << (char)ch;
+      appendOutputChar(static_cast<char>(ch));
     }
-    std::cout.flush();
   }
 
   void syscall_WRITE_DATA() {
     // 0x8102 - Write character to LCD (from A)
-    std::cout << (char)A;
+    appendOutputChar(static_cast<char>(A));
   }
 
   void syscall_WRITE_HEX() {
     // 0x8104 - Write hex number to LCD (from A)
-    std::cout << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
-              << (int)A << std::dec;
+    std::ostringstream oss;
+    oss << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
+        << static_cast<int>(A);
+    appendOutputString(oss.str());
   }
 
   void syscall_WRITE_INSTR() {
@@ -221,18 +362,17 @@ private:
 
   void syscall_LCD_INIT() {
     // 0x8108 - Initialize LCD
-    std::cout << "[LCD INIT]" << std::endl;
+    appendOutputString("[LCD INIT]\n");
   }
 
   void syscall_LCD_OFF() {
     // 0x810A - Turn off LCD
-    std::cout << "[LCD OFF]" << std::endl;
+    appendOutputString("[LCD OFF]\n");
   }
 
   void syscall_LCD_CLR() {
     // 0x810C - Clear LCD
-    std::cout << "\033[2J\033[H"; // ANSI clear screen
-    std::cout.flush();
+    appendOutputString("\n");
   }
 
   void syscall_DELAY_US() {
@@ -253,15 +393,26 @@ private:
 
   void syscall_WAIT_ENTER() {
     // 0x8114 - Display "PRESS ENTER" and wait for ENTER
-    std::cout << "PRESS ENTER." << std::endl;
+    if (!waitingForInput || waitType != WaitType::WaitEnter) {
+      appendOutputString("PRESS ENTER.\n");
+    }
+
     std::string line;
-    std::getline(std::cin, line);
+    if (consumeLine(line)) {
+      clearWaitState();
+    } else {
+      setWaitState(WaitType::WaitEnter);
+    }
   }
 
   void syscall_WAIT_ENTER_NW() {
     // 0x8116 - Wait for ENTER key (no message)
     std::string line;
-    std::getline(std::cin, line);
+    if (consumeLine(line)) {
+      clearWaitState();
+    } else {
+      setWaitState(WaitType::WaitEnterNW);
+    }
   }
 
   void syscall_TEST_ENTER() {
@@ -272,46 +423,71 @@ private:
   void syscall_WAIT_ENT_ESC() {
     // 0x811A - Wait for ENTER or ESC
     char ch;
-    if (std::cin.get(ch)) {
-      A = (uint8_t)ch;
-      if (ch == '\n' || ch == '\r') {
-        setCarryFlag(false); // ENTER pressed
-      } else if (ch == 27) {
-        setCarryFlag(true); // ESC pressed
-      }
+    if (!consumeChar(ch)) {
+      setWaitState(WaitType::WaitEnterEsc);
+      return;
+    }
+
+    clearWaitState();
+    A = static_cast<uint8_t>(ch);
+
+    if (ch == '\n') {
+      setCarryFlag(false); // ENTER pressed
+    } else if (static_cast<unsigned char>(ch) == 27) {
+      setCarryFlag(true); // ESC pressed
     }
   }
 
   void syscall_WAIT_KEY() {
     // 0x811C - Wait for any key (accepts 0-9, a-f/A-F for values 0-15)
     std::string line;
-    std::getline(std::cin, line);
+    if (!consumeLine(line)) {
+      setWaitState(WaitType::WaitKey);
+      return;
+    }
+
+    clearWaitState();
 
     if (line.empty()) {
       A = 0;
+      return;
+    }
+
+    char ch = line[0];
+    if (ch >= '0' && ch <= '9') {
+      A = ch - '0';
+    } else if (ch >= 'a' && ch <= 'f') {
+      A = 10 + (ch - 'a');
+    } else if (ch >= 'A' && ch <= 'F') {
+      A = 10 + (ch - 'A');
     } else {
-      char ch = line[0];
-      if (ch >= '0' && ch <= '9') {
-        A = ch - '0'; // 0-9
-      } else if (ch >= 'a' && ch <= 'f') {
-        A = 10 + (ch - 'a'); // a-f -> 10-15
-      } else if (ch >= 'A' && ch <= 'F') {
-        A = 10 + (ch - 'A'); // A-F -> 10-15
-      } else {
-        A = 0; // Invalid input, default to 0
-      }
+      A = 0;
     }
   }
 
   void syscall_GET_NUM() {
     // 0x811E - Read BCD number (4 digits)
-    std::string input;
-    std::cin >> input;
-    if (input.length() >= 4) {
-      // Store BCD in R3:R2 (most significant in R3)
+    std::string line;
+    if (!consumeLine(line)) {
+      setWaitState(WaitType::GetNum);
+      return;
+    }
+
+    clearWaitState();
+
+    std::istringstream iss(line);
+    std::string token;
+    iss >> token;
+
+    auto isDigit = [](char ch) {
+      return std::isdigit(static_cast<unsigned char>(ch));
+    };
+
+    if (token.length() >= 4 && isDigit(token[0]) && isDigit(token[1]) &&
+        isDigit(token[2]) && isDigit(token[3])) {
       uint8_t bank = getRegisterBank();
-      dataMemory[bank * 8 + 3] = ((input[0] - '0') << 4) | (input[1] - '0');
-      dataMemory[bank * 8 + 2] = ((input[2] - '0') << 4) | (input[3] - '0');
+      dataMemory[bank * 8 + 3] = ((token[0] - '0') << 4) | (token[1] - '0');
+      dataMemory[bank * 8 + 2] = ((token[2] - '0') << 4) | (token[3] - '0');
     }
   }
 
@@ -443,13 +619,16 @@ private:
     systemCalls[0x812A] = [this]() { syscall_DIV_4_2(); };
   }
 
-  bool handleSystemCall(uint16_t address) {
+  SystemCallResult handleSystemCall(uint16_t address) {
     auto it = systemCalls.find(address);
     if (it != systemCalls.end()) {
       it->second(); // Execute the system call
-      return true;
+      if (waitingForInput) {
+        return SystemCallResult::Pending;
+      }
+      return SystemCallResult::Handled;
     }
-    return false;
+    return SystemCallResult::NotHandled;
   }
 
 public:
@@ -458,7 +637,9 @@ public:
         P3(dataMemory[0xB0]), IE(dataMemory[0xA8]), IP(dataMemory[0xB8]),
         TMOD(dataMemory[0x89]), TCON(dataMemory[0x88]), TH0(dataMemory[0x8C]),
         TL0(dataMemory[0x8A]), TH1(dataMemory[0x8D]), TL1(dataMemory[0x8B]),
-        SCON(dataMemory[0x98]), SBUF(dataMemory[0x99]), PCON(dataMemory[0x87]) {
+        SCON(dataMemory[0x98]), SBUF(dataMemory[0x99]), PCON(dataMemory[0x87]),
+        running(false), cycleCount(0), captureOutput(false), mirrorStdout(true),
+        waitingForInput(false), waitType(WaitType::None) {
     reset();
   }
 
@@ -487,8 +668,17 @@ public:
     running = false;
     cycleCount = 0;
 
+    inputBuffer.clear();
+    outputBuffer.clear();
+    clearWaitState();
+
     // Initialize system calls for dsm-51 compatibility
     initSystemCalls();
+  }
+
+  bool loadHexFromString(const std::string &hexData) {
+    std::istringstream stream(hexData);
+    return loadHexStream(stream, false, "string input");
   }
 
   bool loadHexFile(const std::string &filename) {
@@ -498,57 +688,75 @@ public:
       return false;
     }
 
-    std::string line;
-    uint32_t extendedAddress = 0;
+    bool result = loadHexStream(file, true, filename);
+    file.close();
+    return result;
+  }
 
-    while (std::getline(file, line)) {
-      if (line.empty() || line[0] != ':') {
-        continue;
-      }
+  void setOutputOptions(bool capture, bool mirror) {
+    captureOutput = capture;
+    mirrorStdout = mirror;
+    if (!captureOutput) {
+      outputBuffer.clear();
+    }
+  }
 
-      // Parse Intel HEX format
-      // :LLAAAATT[DD...]CC
-      // LL = byte count
-      // AAAA = address
-      // TT = record type
-      // DD = data bytes
-      // CC = checksum
-
-      if (line.length() < 11) {
-        std::cerr << "Warning: Invalid line in HEX file: " << line << std::endl;
-        continue;
-      }
-
-      uint8_t byteCount = std::stoi(line.substr(1, 2), nullptr, 16);
-      uint16_t address = std::stoi(line.substr(3, 4), nullptr, 16);
-      uint8_t recordType = std::stoi(line.substr(7, 2), nullptr, 16);
-
-      if (recordType == 0x00) {
-        // Data record
-        uint32_t fullAddress = extendedAddress + address;
-        for (int i = 0; i < byteCount; i++) {
-          uint8_t byte = std::stoi(line.substr(9 + i * 2, 2), nullptr, 16);
-          if (fullAddress + i < sizeof(programMemory)) {
-            programMemory[fullAddress + i] = byte;
-          }
-        }
-      } else if (recordType == 0x01) {
-        // End of file record
-        break;
-      } else if (recordType == 0x02) {
-        // Extended segment address record
-        uint16_t segment = std::stoi(line.substr(9, 4), nullptr, 16);
-        extendedAddress = segment * 16;
-      } else if (recordType == 0x04) {
-        // Extended linear address record
-        uint16_t upper = std::stoi(line.substr(9, 4), nullptr, 16);
-        extendedAddress = upper << 16;
-      }
+  size_t readOutput(char *buffer, size_t maxLen) {
+    if (!buffer || maxLen == 0) {
+      return 0;
     }
 
-    file.close();
-    std::cout << "Successfully loaded HEX file: " << filename << std::endl;
-    return true;
+    size_t count = 0;
+    while (count < maxLen && !outputBuffer.empty()) {
+      buffer[count++] = outputBuffer.front();
+      outputBuffer.pop_front();
+    }
+    return count;
+  }
+
+  std::string readOutputString() {
+    std::string result(outputBuffer.begin(), outputBuffer.end());
+    outputBuffer.clear();
+    return result;
+  }
+
+  size_t getOutputSize() const { return outputBuffer.size(); }
+
+  void clearOutputBuffer() { outputBuffer.clear(); }
+
+  void pushInput(const char *data, size_t length) {
+    if (!data) {
+      return;
+    }
+    for (size_t i = 0; i < length; ++i) {
+      char ch = data[i];
+      if (ch == '\r') {
+        continue;
+      }
+      inputBuffer.push_back(ch);
+    }
+  }
+
+  void pushInput(const std::string &text) {
+    pushInput(text.data(), text.size());
+  }
+
+  bool isWaitingForInput() const { return waitingForInput; }
+
+  int getWaitTypeCode() const { return static_cast<int>(waitType); }
+
+  void getStateSnapshot(EmulatorState &state) const {
+    state.cycles = cycleCount;
+    state.pc = PC;
+    state.dptr = DPTR;
+    state.sp = SP;
+    state.a = A;
+    state.b = B;
+    state.psw = PSW;
+    state.p0 = P0;
+    state.p1 = P1;
+    state.p2 = P2;
+    state.p3 = P3;
   }
 
   void executeInstruction() {
@@ -651,8 +859,13 @@ public:
       uint8_t addr_low = fetch();
       uint16_t addr11 = ((opcode & 0xE0) << 3) | addr_low;
       uint16_t targetAddr = (PC & 0xF800) | addr11;
-      if (handleSystemCall(targetAddr)) {
+      SystemCallResult callResult = handleSystemCall(targetAddr);
+
+      if (callResult == SystemCallResult::Handled) {
         cycleCount += 2;
+      } else if (callResult == SystemCallResult::Pending) {
+        PC -= 2; // Re-execute the call instruction once input is available
+        running = false;
       } else {
         push(PC & 0xFF);
         push(PC >> 8);
@@ -667,8 +880,13 @@ public:
       uint8_t high = fetch();
       uint8_t low = fetch();
       uint16_t targetAddr = (high << 8) | low;
-      if (handleSystemCall(targetAddr)) {
+      SystemCallResult callResult = handleSystemCall(targetAddr);
+
+      if (callResult == SystemCallResult::Handled) {
         cycleCount += 2;
+      } else if (callResult == SystemCallResult::Pending) {
+        PC -= 3; // Re-execute the call instruction once input is available
+        running = false;
       } else {
         push(PC & 0xFF);
         push(PC >> 8);
@@ -1929,6 +2147,156 @@ public:
   }
 };
 
+extern "C" {
+
+Intel8051 *emulator_create() { return new Intel8051(); }
+
+void emulator_destroy(Intel8051 *cpu) { delete cpu; }
+
+void emulator_reset(Intel8051 *cpu) {
+  if (cpu) {
+    cpu->reset();
+  }
+}
+
+int emulator_load_hex_string(Intel8051 *cpu, const char *hexData) {
+  if (!cpu || !hexData) {
+    return 0;
+  }
+  return cpu->loadHexFromString(hexData) ? 1 : 0;
+}
+
+int emulator_load_hex_file(Intel8051 *cpu, const char *filename) {
+  if (!cpu || !filename) {
+    return 0;
+  }
+  return cpu->loadHexFile(filename) ? 1 : 0;
+}
+
+void emulator_set_output_options(Intel8051 *cpu, int capture, int mirror) {
+  if (!cpu) {
+    return;
+  }
+  cpu->setOutputOptions(capture != 0, mirror != 0);
+}
+
+size_t emulator_read_output(Intel8051 *cpu, char *buffer, size_t maxLen) {
+  if (!cpu) {
+    return 0;
+  }
+  return cpu->readOutput(buffer, maxLen);
+}
+
+size_t emulator_get_output_size(Intel8051 *cpu) {
+  if (!cpu) {
+    return 0;
+  }
+  return cpu->getOutputSize();
+}
+
+void emulator_clear_output(Intel8051 *cpu) {
+  if (!cpu) {
+    return;
+  }
+  cpu->clearOutputBuffer();
+}
+
+void emulator_push_input(Intel8051 *cpu, const char *text) {
+  if (!cpu || !text) {
+    return;
+  }
+  cpu->pushInput(text, std::strlen(text));
+}
+
+void emulator_push_input_len(Intel8051 *cpu, const char *data, size_t length) {
+  if (!cpu || !data) {
+    return;
+  }
+  cpu->pushInput(data, length);
+}
+
+void emulator_run_cycles(Intel8051 *cpu, uint32_t cycles) {
+  if (!cpu) {
+    return;
+  }
+  cpu->run(static_cast<uint64_t>(cycles));
+}
+
+void emulator_step(Intel8051 *cpu) {
+  if (!cpu) {
+    return;
+  }
+  cpu->step();
+}
+
+void emulator_stop(Intel8051 *cpu) {
+  if (!cpu) {
+    return;
+  }
+  cpu->stop();
+}
+
+int emulator_is_waiting(Intel8051 *cpu) {
+  if (!cpu) {
+    return 0;
+  }
+  return cpu->isWaitingForInput() ? 1 : 0;
+}
+
+int emulator_wait_reason(Intel8051 *cpu) {
+  if (!cpu) {
+    return 0;
+  }
+  return cpu->getWaitTypeCode();
+}
+
+void emulator_get_state(Intel8051 *cpu, EmulatorState *outState) {
+  if (!cpu || !outState) {
+    return;
+  }
+  cpu->getStateSnapshot(*outState);
+}
+
+size_t emulator_state_size() { return sizeof(EmulatorState); }
+
+size_t emulator_state_offset(int field) {
+  switch (field) {
+  case 0:
+    return offsetof(EmulatorState, cycles);
+  case 1:
+    return offsetof(EmulatorState, pc);
+  case 2:
+    return offsetof(EmulatorState, dptr);
+  case 3:
+    return offsetof(EmulatorState, sp);
+  case 4:
+    return offsetof(EmulatorState, a);
+  case 5:
+    return offsetof(EmulatorState, b);
+  case 6:
+    return offsetof(EmulatorState, psw);
+  case 7:
+    return offsetof(EmulatorState, p0);
+  case 8:
+    return offsetof(EmulatorState, p1);
+  case 9:
+    return offsetof(EmulatorState, p2);
+  case 10:
+    return offsetof(EmulatorState, p3);
+  default:
+    return static_cast<size_t>(-1);
+  }
+}
+
+uint8_t emulator_read_byte(void *ptr, size_t offset) {
+  if (!ptr) {
+    return 0;
+  }
+  return static_cast<uint8_t *>(ptr)[offset];
+}
+}
+
+#ifndef BUILDING_FOR_WASM
 int main(int argc, char *argv[]) {
   std::cout << "8051 Emulator v1.0" << std::endl;
   std::cout << "==================" << std::endl;
@@ -2032,3 +2400,4 @@ int main(int argc, char *argv[]) {
   std::cout << "\nEmulation complete." << std::endl;
   return 0;
 }
+#endif
