@@ -1,4 +1,5 @@
-import CodeMirror from '@uiw/react-codemirror';
+import CodeMirror from "@uiw/react-codemirror";
+import { atomone } from "@uiw/codemirror-theme-atomone";
 
 interface HexInputProps {
   emulatorHex: string;
@@ -15,12 +16,13 @@ export function HexInput({
 }: HexInputProps) {
   return (
     <div className="flex flex-col bg-white rounded-xl shadow-lg p-6 h-full">
-      <div className="flex-grow border border-gray-200 rounded-lg overflow-hidden">
+      <div className="flex-grow border border-gray-200 rounded-lg overflow-auto min-h-0">
         <CodeMirror
           value={emulatorHex}
-          height="100%"
+          height="386px"
           onChange={(value) => onEmulatorHexChange(value)}
           placeholder="Intel HEX data will appear here after assembly, or paste your own..."
+          theme={atomone}
           basicSetup={{
             lineNumbers: true,
             highlightActiveLineGutter: true,
@@ -29,8 +31,7 @@ export function HexInput({
             tabSize: 4,
           }}
           style={{
-            fontSize: '14px',
-            height: '100%',
+            fontSize: "14px",
           }}
         />
       </div>
@@ -44,4 +45,3 @@ export function HexInput({
     </div>
   );
 }
-

@@ -23,10 +23,10 @@ export function CodeEditor({
           {loadError}
         </div>
       )}
-      <div className="flex-grow border border-gray-200 rounded-lg overflow-hidden">
+      <div className="flex-grow border border-gray-200 rounded-lg overflow-auto min-h-0">
         <CodeMirror
           value={asmCode}
-          height="100%"
+          height="386px"
           onChange={(value) => setAsmCode(value)}
           placeholder="Enter your 8051 assembly code here..."
           theme={atomone}
@@ -39,7 +39,6 @@ export function CodeEditor({
           }}
           style={{
             fontSize: "14px",
-            height: "100%",
           }}
         />
       </div>
