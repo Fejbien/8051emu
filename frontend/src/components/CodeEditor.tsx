@@ -1,3 +1,6 @@
+import CodeMirror from "@uiw/react-codemirror";
+import { atomone } from "@uiw/codemirror-theme-atomone";
+
 interface CodeEditorProps {
   asmCode: string;
   setAsmCode: (code: string) => void;
@@ -13,22 +16,6 @@ export function CodeEditor({
   factoryLoaded,
   onAssemble,
 }: CodeEditorProps) {
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const target = e.target as HTMLTextAreaElement;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-      const newValue = asmCode.substring(0, start) + '    ' + asmCode.substring(end);
-      setAsmCode(newValue);
-      
-      // Set cursor position after the inserted spaces
-      setTimeout(() => {
-        target.selectionStart = target.selectionEnd = start + 4;
-      }, 0);
-    }
-  };
-
   return (
     <div className="flex flex-col bg-white rounded-xl shadow-lg p-6 h-full">
       {loadError && (
@@ -36,14 +23,26 @@ export function CodeEditor({
           {loadError}
         </div>
       )}
-      <textarea
-        className="flex-grow w-full p-4 font-mono text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 resize-none"
-        value={asmCode}
-        onChange={(e) => setAsmCode(e.target.value)}
-        onKeyDown={handleKeyDown}
-        spellCheck="false"
-        placeholder="Enter your 8051 assembly code here..."
-      />
+      <div className="flex-grow border border-gray-200 rounded-lg overflow-hidden">
+        <CodeMirror
+          value={asmCode}
+          height="100%"
+          onChange={(value) => setAsmCode(value)}
+          placeholder="Enter your 8051 assembly code here..."
+          theme={atomone}
+          basicSetup={{
+            lineNumbers: true,
+            highlightActiveLineGutter: true,
+            highlightActiveLine: true,
+            foldGutter: true,
+            tabSize: 4,
+          }}
+          style={{
+            fontSize: "14px",
+            height: "100%",
+          }}
+        />
+      </div>
       <button
         onClick={onAssemble}
         disabled={!factoryLoaded}
@@ -54,4 +53,3 @@ export function CodeEditor({
     </div>
   );
 }
-

@@ -1,3 +1,5 @@
+import CodeMirror from '@uiw/react-codemirror';
+
 interface HexInputProps {
   emulatorHex: string;
   onEmulatorHexChange: (value: string) => void;
@@ -13,13 +15,25 @@ export function HexInput({
 }: HexInputProps) {
   return (
     <div className="flex flex-col bg-white rounded-xl shadow-lg p-6 h-full">
-      <textarea
-        className="flex-grow w-full p-4 font-mono text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-gray-50 resize-none"
-        value={emulatorHex}
-        onChange={(e) => onEmulatorHexChange(e.target.value)}
-        spellCheck="false"
-        placeholder="Intel HEX data will appear here after assembly, or paste your own..."
-      />
+      <div className="flex-grow border border-gray-200 rounded-lg overflow-hidden">
+        <CodeMirror
+          value={emulatorHex}
+          height="100%"
+          onChange={(value) => onEmulatorHexChange(value)}
+          placeholder="Intel HEX data will appear here after assembly, or paste your own..."
+          basicSetup={{
+            lineNumbers: true,
+            highlightActiveLineGutter: true,
+            highlightActiveLine: true,
+            foldGutter: true,
+            tabSize: 4,
+          }}
+          style={{
+            fontSize: '14px',
+            height: '100%',
+          }}
+        />
+      </div>
       <button
         onClick={onLoadProgram}
         disabled={!emulatorReady}
