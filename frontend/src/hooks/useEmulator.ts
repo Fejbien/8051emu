@@ -13,6 +13,7 @@ export function useEmulator() {
   const [emulatorState, setEmulatorState] = useState<EmulatorSnapshot | null>(
     null
   );
+  const [registerBanks, setRegisterBanks] = useState<Uint8Array | null>(null);
   const [runCycles, setRunCycles] = useState(1000);
   const [emulatorHex, setEmulatorHex] = useState("");
 
@@ -126,6 +127,7 @@ export function useEmulator() {
           stateSize: wrap("emulator_state_size", "number", []),
           stateOffset: wrap("emulator_state_offset", "number", ["number"]),
           readByte: wrap("emulator_read_byte", "number", ["number", "number"]),
+          readMemory: wrap("emulator_read_memory", "number", ["number", "number"]),
         };
 
         const instancePtr = api.create();
@@ -272,6 +274,13 @@ export function useEmulator() {
       };
 
       setEmulatorState(snapshot);
+      
+      // Also update register banks
+      const banks = new Uint8Array(32);
+      for (let i = 0; i < 32; i++) {
+        banks[i] = api.readMemory(instance, i);
+      }
+      setRegisterBanks(banks);
     } finally {
       module._free(statePtr);
     }
@@ -476,7 +485,22 @@ export function useEmulator() {
     
     const ram = new Uint8Array(256);
     for (let i = 0; i < 256; i++) {
-      ram[i] = api.readByte(instance, i);
+      ram[i] = api.readMemory(instance, i);
+    }
+    return ram;
+  }
+
+  function readExternalRAM(offset: number, length: number): Uint8Array | null {
+    const context = getEmulatorContext();
+    if (!context) {
+      return null;
+    }
+    const { api, instance } = context;
+    
+    const ram = new Uint8Array(length);
+    // External RAM starts at offset 256 (0x100) in the memory space
+    for (let i = 0; i < length; i++) {
+      ram[i] = api.readMemory(instance, 256 + offset + i);
     }
     return ram;
   }
@@ -488,6 +512,7 @@ export function useEmulator() {
     emulatorOutput,
     emulatorWaiting,
     emulatorState,
+    registerBanks,
     runCycles,
     emulatorHex,
     handleEmulatorHexChange,
@@ -499,6 +524,7 @@ export function useEmulator() {
     handleResetEmulator,
     handleKeypad,
     readRAM,
+    readExternalRAM,
   };
 }
 

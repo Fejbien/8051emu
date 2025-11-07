@@ -4460,6 +4460,7 @@ var _emulator_get_state = Module['_emulator_get_state'] = makeInvalidEarlyAccess
 var _emulator_state_size = Module['_emulator_state_size'] = makeInvalidEarlyAccess('_emulator_state_size');
 var _emulator_state_offset = Module['_emulator_state_offset'] = makeInvalidEarlyAccess('_emulator_state_offset');
 var _emulator_read_byte = Module['_emulator_read_byte'] = makeInvalidEarlyAccess('_emulator_read_byte');
+var _emulator_read_memory = Module['_emulator_read_memory'] = makeInvalidEarlyAccess('_emulator_read_memory');
 var _fflush = makeInvalidEarlyAccess('_fflush');
 var _strerror = makeInvalidEarlyAccess('_strerror');
 var _malloc = Module['_malloc'] = makeInvalidEarlyAccess('_malloc');
@@ -4493,6 +4494,7 @@ function assignWasmExports(wasmExports) {
   _emulator_state_size = Module['_emulator_state_size'] = createExportWrapper('emulator_state_size', 0);
   _emulator_state_offset = Module['_emulator_state_offset'] = createExportWrapper('emulator_state_offset', 1);
   _emulator_read_byte = Module['_emulator_read_byte'] = createExportWrapper('emulator_read_byte', 2);
+  _emulator_read_memory = Module['_emulator_read_memory'] = createExportWrapper('emulator_read_memory', 2);
   _fflush = createExportWrapper('fflush', 1);
   _strerror = createExportWrapper('strerror', 1);
   _malloc = Module['_malloc'] = createExportWrapper('malloc', 1);

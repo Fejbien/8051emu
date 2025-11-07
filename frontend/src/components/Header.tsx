@@ -1,8 +1,10 @@
 interface HeaderProps {
   onShowHexOutput: () => void;
+  onShowSyscalls: () => void;
+  onShowUsageInfo: () => void;
 }
 
-export function Header({ onShowHexOutput }: HeaderProps) {
+export function Header({ onShowHexOutput, onShowSyscalls, onShowUsageInfo }: HeaderProps) {
   return (
     <header className="bg-gradient-to-r from-blue-600 to-blue-700 shadow-lg">
       <div className="max-w-[1800px] mx-auto px-6 py-4 flex items-center justify-between">
@@ -11,14 +13,27 @@ export function Header({ onShowHexOutput }: HeaderProps) {
             <h1 className="text-2xl font-bold text-white">8051 Emulator with support for DSM-51 instructions</h1>
           </div>
         </div>
-        <button
-          onClick={onShowHexOutput}
-          className="px-4 py-2 bg-white text-blue-700 font-semibold rounded-lg hover:bg-blue-50 transition-colors shadow-md"
-        >
-          View Hex Outputs (Debug)
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={onShowUsageInfo}
+            className="px-4 py-2 bg-white text-blue-700 font-semibold rounded-lg hover:bg-blue-50 transition-colors shadow-md"
+          >
+            Usage & Differences
+          </button>
+          <button
+            onClick={onShowSyscalls}
+            className="px-4 py-2 bg-white text-blue-700 font-semibold rounded-lg hover:bg-blue-50 transition-colors shadow-md"
+          >
+            Syscalls Reference
+          </button>
+          <button
+            onClick={onShowHexOutput}
+            className="px-4 py-2 bg-white text-blue-700 font-semibold rounded-lg hover:bg-blue-50 transition-colors shadow-md"
+          >
+            View Hex Outputs (Debug)
+          </button>
+        </div>
       </div>
     </header>
   );
 }
-

@@ -759,6 +759,34 @@ public:
     state.p3 = P3;
   }
 
+  // Read a byte from memory (for external access)
+  uint8_t readMemoryByte(size_t offset) const {
+    if (offset < 256) {
+      // Internal RAM (0x00-0xFF)
+      // Note: readDataMemory is private and does SFR mapping, so directly
+      // access dataMemory But we need to handle SFR registers properly
+      uint8_t addr = static_cast<uint8_t>(offset);
+      if (addr == 0xE0) {
+        return A; // Accumulator
+      } else if (addr == 0xF0) {
+        return B; // B register
+      } else if (addr == 0xD0) {
+        return PSW; // PSW
+      } else if (addr == 0x81) {
+        return SP; // Stack Pointer
+      } else if (addr == 0x82) {
+        return DPTR & 0xFF; // DPL
+      } else if (addr == 0x83) {
+        return DPTR >> 8; // DPH
+      }
+      return dataMemory[addr];
+    } else {
+      // External RAM (256+)
+      uint16_t extAddr = static_cast<uint16_t>(offset - 256);
+      return externalRAM[extAddr];
+    }
+  }
+
   void executeInstruction() {
     uint8_t opcode = fetch();
 
@@ -2288,11 +2316,20 @@ size_t emulator_state_offset(int field) {
   }
 }
 
+// Read a byte from a raw pointer (for state structures, malloc'd buffers, etc.)
 uint8_t emulator_read_byte(void *ptr, size_t offset) {
   if (!ptr) {
     return 0;
   }
   return static_cast<uint8_t *>(ptr)[offset];
+}
+
+// Read a byte from emulator's internal/external memory
+uint8_t emulator_read_memory(Intel8051 *cpu, size_t offset) {
+  if (!cpu) {
+    return 0;
+  }
+  return cpu->readMemoryByte(offset);
 }
 }
 

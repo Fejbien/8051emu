@@ -70,5 +70,6 @@ export interface EmulatorApi {
   stateSize: () => number;
   stateOffset: (field: number) => number;
   readByte: (ptr: number, offset: number) => number;
+  readMemory: (ptr: number, offset: number) => number;
 }
 

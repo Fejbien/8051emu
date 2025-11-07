@@ -6,4 +6,4 @@ emcc main.cpp \
  -s MODULARIZE=1 \
  -s EXPORT_NAME="createEmulatorModule" \
  -s EXPORTED_RUNTIME_METHODS='["cwrap","UTF8ToString","stringToUTF8","lengthBytesUTF8"]' \
- -s EXPORTED_FUNCTIONS='["_malloc","_free","_emulator_create","_emulator_destroy","_emulator_reset","_emulator_load_hex_string","_emulator_set_output_options","_emulator_read_output","_emulator_get_output_size","_emulator_clear_output","_emulator_push_input_len","_emulator_run_cycles","_emulator_step","_emulator_stop","_emulator_is_waiting","_emulator_wait_reason","_emulator_get_state","_emulator_state_size","_emulator_state_offset", "_emulator_read_byte"]'
+ -s EXPORTED_FUNCTIONS='["_malloc","_free","_emulator_create","_emulator_destroy","_emulator_reset","_emulator_load_hex_string","_emulator_set_output_options","_emulator_read_output","_emulator_get_output_size","_emulator_clear_output","_emulator_push_input_len","_emulator_run_cycles","_emulator_step","_emulator_stop","_emulator_is_waiting","_emulator_wait_reason","_emulator_get_state","_emulator_state_size","_emulator_state_offset","_emulator_read_byte","_emulator_read_memory"]'
