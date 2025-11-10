@@ -57,8 +57,7 @@
             {
                 if (symbolTable.ContainsKey(label))
                 {
-                    Console.WriteLine($"Error: Duplicate label '{label}'");
-                    return (flowControl: true, value: null);
+                    throw new Exception($"Error: Duplicate label '{label}'");
                 }
                 else
                 {
@@ -98,8 +97,7 @@
             }
             else
             {
-                Console.WriteLine($"Error: Unknown instruction in line '{line}'");
-                return (flowControl: true, value: null);
+                throw new Exception($"Error: Unknown instruction in line '{line}'");
             }
 
             return (flowControl: null, value: null);
@@ -436,7 +434,8 @@
             }
 
             string key = mnemonic + " " + string.Join(", ", normalizedOperands);
-            Console.WriteLine($"[Debug] Line: '{line}', Key built: '{key}'");
+            if (DEBUG)
+                Console.WriteLine($"[Debug] Line: '{line}', Key built: '{key}'");
 
             if (opcodeTable.TryGetValue(key, out var instructionInfo))
             {
@@ -478,8 +477,8 @@
                     };
                 }
             }
-            Console.WriteLine($"[Debug] ERROR: Key '{key}' (and fallbacks) not found in OpcodeTable.");
-            return null;
+
+            throw new Exception($"ERROR: Key '{key}' (and fallbacks) not found in OpcodeTable.");
         }
 
         static int ResolveSymbol(string s, Dictionary<string, int> symbolTable)
