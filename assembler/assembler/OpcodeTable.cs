@@ -87,7 +87,7 @@
                 { "CPL bit", new InstructionInfo(0xB2, 2) },
 
                 // DA
-                { "DA", new InstructionInfo(0xD4, 1) },
+                { "DA A", new InstructionInfo(0xD4, 1) },
 
                 // DEC
                 { "DEC A", new InstructionInfo(0x14, 1) },

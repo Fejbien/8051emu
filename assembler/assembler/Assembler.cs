@@ -556,7 +556,13 @@
 
             if (string.IsNullOrEmpty(cleanNumber))
             {
-                throw new FormatException("Syntax Error: Missing number after '#'.");
+                throw new FormatException("Syntax Error: Missing number or value.");
+            }
+
+            if (cleanNumber.StartsWith("'") && cleanNumber.EndsWith("'") && cleanNumber.Length == 3)
+            {
+                char c = cleanNumber[1];
+                return (int)c;
             }
 
             if (cleanNumber.EndsWith('H') || cleanNumber.EndsWith('h'))

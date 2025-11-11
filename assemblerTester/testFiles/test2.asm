@@ -1,0 +1,37 @@
+	LJMP START
+	ORG	100H
+	
+START:
+    LCALL LCD_CLR
+    CLR RS0
+    CLR RS1
+
+	SJMP MAIN
+
+MAIN:
+    LCALL WAIT_KEY
+    MOV R0, A
+    ADD A, #'0'
+    LCALL WRITE_DATA
+
+    MOV A, #'-'
+    LCALL WRITE_DATA
+
+    LCALL WAIT_KEY
+    MOV R1, A 
+    ADD A, #'0'
+    LCALL WRITE_DATA
+
+    MOV A, #'='
+    LCALL WRITE_DATA
+
+    CLR C
+    MOV A, R0
+    SUBB A, R1
+    LCALL WRITE_HEX
+
+    SJMP STOP
+	
+STOP:
+	SJMP $
+	NOP

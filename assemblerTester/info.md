@@ -1,0 +1,35 @@
+# DSM-51 Assembler Build & Test Guide
+# Testing only works on Windows
+## Since the official DSM51 assembler is only avaiable for windows
+
+## Building the Project
+
+Run the following commands to publish the project for each platform inside of the assembler project:
+
+### Windows (x64)
+```bash
+dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
+```
+
+### macOS (ARM64)
+```bash
+dotnet publish -c Release -r osx-arm64 --self-contained true /p:PublishSingleFile=true
+```
+
+After publishing on mac, make the output file executable:
+```bash
+chmod +x file
+```
+
+## Required Tools
+
+Download the DSM-51 official assembler. 
+[Download](https://micromade.pl/wsparcie/biblioteka-programow/programy-do-dsm-51)
+
+## Testing 
+
+1. Add any `.asm` file into this folder to test compilation.  
+3. Run the Python test script:
+   ```bash
+   python tester.py
+   ```
