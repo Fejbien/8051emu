@@ -34,4 +34,4 @@ MAIN:
 	
 STOP:
 	SJMP $
-	NOP
+    NOP
