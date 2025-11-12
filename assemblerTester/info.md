@@ -28,7 +28,8 @@ Download the DSM-51 official assembler.
 
 ## Testing 
 
-1. Add any `.asm` file into this folder to test compilation.  
+1. Add any `.asm` file into this folder to test compilation.
+2. Add compiled assembler to this folder.
 3. Run the Python test script:
    ```bash
    python tester.py
