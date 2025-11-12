@@ -48,7 +48,12 @@
                 return (flowControl: false, value: null);
             }
 
-            string[] parts = line.Trim().Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+            string[] parts = line.Trim().Split([' ', '\t'], 2, StringSplitOptions.RemoveEmptyEntries);
+            Console.WriteLine($"[Debug P1] Processing line: '{line}'");
+            foreach (var part in parts)
+            {
+                Console.WriteLine($"           > Part: '{part}'");
+            }
             string mnemonic = parts[0].ToUpper();
 
             // Handle Labels
@@ -121,7 +126,7 @@
                 return (flowControl: false, value: locationCounter);
             }
 
-            string[] parts = line.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            string[] parts = line.Trim().Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 0) return (flowControl: false, value: locationCounter);
 
             string mnemonic = parts[0].ToUpper();
@@ -404,7 +409,7 @@
         static InstructionMatch? FindInstructionInTable(string line, Dictionary<string, InstructionInfo> opcodeTable)
         {
             string trimmedLine = line.Trim();
-            string[] parts = trimmedLine.Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries);
+            string[] parts = trimmedLine.Split([' ', '\t'], 2, StringSplitOptions.RemoveEmptyEntries);
 
             if (parts.Length == 0) return null;
 
@@ -530,6 +535,8 @@
 
         static string CleanLine(string line)
         {
+            line = line.Replace('\t', ' ');
+
             int commentIndex = line.IndexOf(';');
             if (commentIndex != -1)
             {
