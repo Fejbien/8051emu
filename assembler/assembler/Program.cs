@@ -4,7 +4,6 @@
     {
         static void Main(string[] args)
         {
-            args = ["C:\\Users\\User\\Desktop\\Git\\8051emu\\assembler\\assembler\\test.asm"];
             if (args.Length == 0)
             {
                 Console.WriteLine("Error: No input file.");
