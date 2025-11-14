@@ -24,11 +24,12 @@
 
             Dictionary<int, byte> outputData = new Dictionary<int, byte>();
             locationCounter = 0;
+            bool isUnreachable = false;
 
             // 2nd pass
             foreach (string rawLine in lines)
             {
-                (bool flowControl, locationCounter) = SecondPass(outputBytes, locationCounter, symbolTable, opcodeTable, outputData, rawLine);
+                (bool flowControl, locationCounter) = SecondPass(outputBytes, locationCounter, symbolTable, opcodeTable, outputData, rawLine, ref isUnreachable);
                 if (!flowControl)
                 {
                     continue;
@@ -41,20 +42,19 @@
 
         private static (bool? flowControl, List<string> value) FirstPass(ref int locationCounter, Dictionary<string, int> symbolTable, Dictionary<string, InstructionInfo> opcodeTable, string rawLine)
         {
-            // Cleaing
             string line = CleanLine(rawLine);
             if (string.IsNullOrEmpty(line))
             {
                 return (flowControl: false, value: null);
             }
 
-            string[] parts = line.Trim().Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
-            string mnemonic = parts[0].ToUpper();
+            string? label = null;
 
-            // Handle Labels
-            string? label = IsLabel(line);
-            if (label != null)
+            int colonIndex = line.IndexOf(':');
+            if (colonIndex != -1)
             {
+                label = line.Substring(0, colonIndex).Trim();
+
                 if (symbolTable.ContainsKey(label))
                 {
                     throw new Exception($"Error: Duplicate label '{label}'");
@@ -63,47 +63,57 @@
                 {
                     symbolTable[label] = locationCounter;
                 }
-                line = line.Substring(label.Length + 1).Trim();
-                if (string.IsNullOrEmpty(line))
-                {
-                    return (flowControl: false, value: null);
-                }
+
+                line = line.Substring(colonIndex + 1).Trim();
             }
 
-            // Handle ORG
+            if (string.IsNullOrEmpty(line))
+            {
+                return (flowControl: false, value: null);
+            }
+
+            string[] parts = line.Trim().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0)
+            {
+                return (flowControl: false, value: null);
+            }
+            string mnemonic = parts[0].ToUpper();
+
             if (mnemonic == "ORG" || mnemonic == ".ORG")
             {
                 int newAddress = ConvertNumberToInt(parts[1]);
                 locationCounter = newAddress;
-                return (flowControl: false, value: null);
             }
-
-            // Handle EQU
-            if (mnemonic == "EQU")
+            else if (mnemonic == "EQU")
             {
-                int value = ConvertNumberToInt(line.Split(' ')[2]);
-                symbolTable[line.Split(' ')[0]] = value;
-                return (flowControl: false, value: null);
+                if (label == null)
+                {
+                    throw new Exception($"Error: EQU directive must have a label.");
+                }
+                int value = ConvertNumberToInt(parts[1]);
+                symbolTable[label] = value;
             }
-
-            // Later handle DB, DW and others
-            // TODO
-
-            // Handle Instructions
-            InstructionMatch? match = FindInstructionInTable(line, opcodeTable);
-            if (match != null)
+            else if (mnemonic == "DB")
             {
-                locationCounter += match.Info.Bytes;
+                // TODO: Handle DB
             }
             else
             {
-                throw new Exception($"Error: Unknown instruction in line '{line}'");
+                InstructionMatch? match = FindInstructionInTable(line, opcodeTable);
+                if (match != null)
+                {
+                    locationCounter += match.Info.Bytes;
+                }
+                else
+                {
+                    throw new Exception($"Error: Unknown instruction in line '{line}'");
+                }
             }
 
             return (flowControl: null, value: null);
         }
 
-        private static (bool flowControl, int value) SecondPass(List<byte> outputBytes, int locationCounter, Dictionary<string, int> symbolTable, Dictionary<string, InstructionInfo> opcodeTable, Dictionary<int, byte> outputData, string rawLine)
+        private static (bool flowControl, int value) SecondPass(List<byte> outputBytes, int locationCounter, Dictionary<string, int> symbolTable, Dictionary<string, InstructionInfo> opcodeTable, Dictionary<int, byte> outputData, string rawLine, ref bool isUnreachable)
         {
             string line = CleanLine(rawLine);
             if (string.IsNullOrEmpty(line))
@@ -113,6 +123,7 @@
 
             if (line.Contains(':'))
             {
+                isUnreachable = false;
                 line = line.Substring(line.IndexOf(':') + 1).Trim();
             }
 
@@ -130,62 +141,69 @@
             {
                 int newAddress = ConvertNumberToInt(parts[1]);
                 locationCounter = newAddress;
+
+                isUnreachable = false;
+
+                return (flowControl: true, value: locationCounter);
             }
             else if (mnemonic == "EQU")
             {
-                // handle EQU
+                return (flowControl: true, value: locationCounter);
             }
             else if (mnemonic == "DB")
             {
-                //h andle DB 
-
+                isUnreachable = false;
+                return (flowControl: true, value: locationCounter);
             }
-            // TODO add else if for DW DS etc.
+
+            if (isUnreachable)
+            {
+                Console.WriteLine($"[Debug P2] Skipping unreachable instruction: '{line}'");
+                return (flowControl: true, value: locationCounter);
+            }
+
+            InstructionMatch? match = Assembler.FindInstructionInTable(line, opcodeTable);
+
+            if (match == null)
+            {
+                throw new Exception($"Error: Unknown instruction in line '{line}'");
+            }
+
+            if (DEBUG)
+            {
+                Console.WriteLine($"[Debug P2] Line: '{line}'");
+                Console.WriteLine($"           > Found key: '{match.MatchedKey}'");
+                Console.WriteLine($"           > Bytes from table: {match.Info.Bytes}");
+                Console.WriteLine($"           > LC before: 0x{locationCounter:X4}");
+            }
+
+            string[] operandStrings = match.OperandStrings;
+            byte[] operandBytes;
+
+            if (match.MatchedKey == "ACALL" || match.MatchedKey == "AJMP")
+            {
+                operandBytes = CalculatePagedJump(match.Info, operandStrings[0], locationCounter, symbolTable);
+                outputData[locationCounter] = operandBytes[0];
+                outputData[locationCounter + 1] = operandBytes[1];
+            }
             else
             {
-                InstructionMatch? match = Assembler.FindInstructionInTable(line, opcodeTable);
-
-                if (match == null)
+                operandBytes = ResolveOperands(match.MatchedKey, operandStrings, locationCounter, symbolTable);
+                outputData[locationCounter] = match.Info.Opcode;
+                for (int i = 0; i < operandBytes.Length; i++)
                 {
-                    throw new Exception($"Error: Unknown instruction in line '{line}'");
+                    outputData[locationCounter + 1 + i] = operandBytes[i];
                 }
+            }
 
-                if (DEBUG)
-                {
-                    Console.WriteLine($"[Debug P2] Line: '{line}'");
-                    Console.WriteLine($"           > Found key: '{match.MatchedKey}'");
-                    Console.WriteLine($"           > Bytes from table: {match.Info.Bytes}");
-                    Console.WriteLine($"           > LC before: 0x{locationCounter:X4}");
-                }
+            locationCounter += match.Info.Bytes;
 
-                string[] operandStrings = match.OperandStrings;
-                byte[] operandBytes;
+            if (DEBUG)
+                Console.WriteLine($"           > LC after: 0x{locationCounter:X4}");
 
-                // Special handling for paged jumps (ACALL/AJMP)
-                if (match.MatchedKey == "ACALL" || match.MatchedKey == "AJMP")
-                {
-                    operandBytes = CalculatePagedJump(match.Info, operandStrings[0], locationCounter, symbolTable);
-                    outputData[locationCounter] = operandBytes[0];
-                    outputData[locationCounter + 1] = operandBytes[1];
-                }
-                else // Normal instructions
-                {
-                    operandBytes = ResolveOperands(match.MatchedKey, operandStrings, locationCounter, symbolTable);
-
-                    outputData[locationCounter] = match.Info.Opcode;
-                    for (int i = 0; i < operandBytes.Length; i++)
-                    {
-                        outputData[locationCounter + 1 + i] = operandBytes[i];
-                    }
-                }
-
-                outputBytes.Add(match.Info.Opcode);
-                outputBytes.AddRange(operandBytes);
-
-                locationCounter += match.Info.Bytes;
-
-                if (DEBUG)
-                    Console.WriteLine($"           > LC after: 0x{locationCounter:X4}");
+            if (match.MatchedKey == "SJMP rel" || match.MatchedKey == "LJMP addr16" || match.MatchedKey == "RET" || match.MatchedKey == "RETI")
+            {
+                isUnreachable = true;
             }
 
             return (flowControl: true, value: locationCounter);
@@ -404,7 +422,7 @@
         static InstructionMatch? FindInstructionInTable(string line, Dictionary<string, InstructionInfo> opcodeTable)
         {
             string trimmedLine = line.Trim();
-            string[] parts = trimmedLine.Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries);
+            string[] parts = trimmedLine.Split([' ', '\t'], 2, StringSplitOptions.RemoveEmptyEntries);
 
             if (parts.Length == 0) return null;
 
@@ -530,6 +548,8 @@
 
         static string CleanLine(string line)
         {
+            line = line.Replace('\t', ' ');
+
             int commentIndex = line.IndexOf(';');
             if (commentIndex != -1)
             {
