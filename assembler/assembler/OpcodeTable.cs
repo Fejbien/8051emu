@@ -1,6 +1,6 @@
 ﻿namespace assembler
 {
-    internal class OpcodeTable
+    public class OpcodeTable
     {
         public Dictionary<string, InstructionInfo> Table { get; private set; }
         public OpcodeTable()

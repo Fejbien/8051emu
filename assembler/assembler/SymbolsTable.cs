@@ -1,6 +1,6 @@
 ﻿namespace assembler
 {
-    internal class SymbolsTable
+    public class SymbolsTable
     {
         public static void PrepopulateSymbols(Dictionary<string, int> table)
         {

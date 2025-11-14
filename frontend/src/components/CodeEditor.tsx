@@ -28,7 +28,7 @@ export function CodeEditor({
           value={asmCode}
           height="386px"
           onChange={(value) => setAsmCode(value)}
-          placeholder="Enter your 8051 assembly code here..."
+          placeholder="Enter your DSM51 assembly code here..."
           theme={atomone}
           basicSetup={{
             lineNumbers: true,

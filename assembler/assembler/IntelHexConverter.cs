@@ -2,7 +2,7 @@
 
 namespace assembler
 {
-    internal class IntelHexConverter
+    public class IntelHexConverter
     {
         public static List<string> ConvertToIntelHex(Dictionary<int, byte> data, int bytesPerLine = 16)
         {

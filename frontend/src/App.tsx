@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { useAssembler } from "./hooks/useAssembler";
+import { useCSharpAssembler } from "./hooks/useCSharpAssembler";
 import { useEmulator } from "./hooks/useEmulator";
 import { Header } from "./components/Header";
 import { HexOutputModal } from "./components/HexOutputModal";
 import { SyscallsModal } from "./components/SyscallsModal";
-import { UsageInfoModal } from "./components/UsageInfoModal";
 import { CodeEditor } from "./components/CodeEditor";
 import { HexInput } from "./components/HexInput";
 import { EmulatorControls } from "./components/EmulatorControls";
@@ -16,7 +15,6 @@ import { ExternalRAMViewer } from "./components/ExternalRAMViewer";
 function App() {
   const [showHexOutput, setShowHexOutput] = useState(false);
   const [showSyscalls, setShowSyscalls] = useState(false);
-  const [showUsageInfo, setShowUsageInfo] = useState(false);
 
   const {
     factoryLoaded,
@@ -26,7 +24,7 @@ function App() {
     loadError,
     intelHex,
     handleAssemble,
-  } = useAssembler();
+  } = useCSharpAssembler();
 
   const {
     emulatorReady,
@@ -61,7 +59,6 @@ function App() {
       <Header
         onShowHexOutput={() => setShowHexOutput(true)}
         onShowSyscalls={() => setShowSyscalls(true)}
-        onShowUsageInfo={() => setShowUsageInfo(true)}
       />
 
       <main className="flex-1 max-w-[1800px] mx-auto w-full p-6 flex flex-col gap-6">
@@ -291,11 +288,6 @@ function App() {
       <SyscallsModal
         isOpen={showSyscalls}
         onClose={() => setShowSyscalls(false)}
-      />
-
-      <UsageInfoModal
-        isOpen={showUsageInfo}
-        onClose={() => setShowUsageInfo(false)}
       />
     </div>
   );

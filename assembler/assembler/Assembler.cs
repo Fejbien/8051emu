@@ -1,6 +1,6 @@
 ﻿namespace assembler
 {
-    internal class Assembler
+    public class Assembler
     {
         const bool DEBUG = true;
 
@@ -14,7 +14,7 @@
             // First Pass
             foreach (string rawLine in lines)
             {
-                (bool? flowControl, List<string> value)=FirstPass(ref locationCounter, symbolTable, opcodeTable, rawLine);
+                (bool? flowControl, List<string> value) = FirstPass(ref locationCounter, symbolTable, opcodeTable, rawLine);
                 switch (flowControl)
                 {
                     case false: continue;
@@ -28,7 +28,7 @@
             // 2nd pass
             foreach (string rawLine in lines)
             {
-                (bool flowControl, locationCounter)=SecondPass(outputBytes, locationCounter, symbolTable, opcodeTable, outputData, rawLine);
+                (bool flowControl, locationCounter) = SecondPass(outputBytes, locationCounter, symbolTable, opcodeTable, outputData, rawLine);
                 if (!flowControl)
                 {
                     continue;

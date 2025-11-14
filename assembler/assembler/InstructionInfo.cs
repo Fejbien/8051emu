@@ -1,6 +1,6 @@
 ﻿namespace assembler
 {
-    internal class InstructionInfo(byte opcode, int bytes)
+    public class InstructionInfo(byte opcode, int bytes)
     {
         public byte Opcode { get; set; } = opcode;
 
