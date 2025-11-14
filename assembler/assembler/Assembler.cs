@@ -36,6 +36,22 @@
                 }
             }
 
+            if (outputData.Count > 0)
+            {
+                int maxAddress = outputData.Keys.Max();
+                for (int i = 0; i <= maxAddress; i++)
+                {
+                    if (outputData.ContainsKey(i))
+                    {
+                        outputBytes.Add(outputData[i]);
+                    }
+                    else
+                    {
+                        outputBytes.Add(0x00);
+                    }
+                }
+            }
+
             Console.WriteLine("Assembly completed successfully.");
             return IntelHexConverter.ConvertToIntelHex(outputData);
         }
